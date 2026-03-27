@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Target Calc</title>
+  <style>
+    /* =====================
+       Reset & Base
+    ===================== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f5f6fa;
+      color: #2f3640;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    /* =====================
+       HUD (타깃 / 타이머 / 점수)
+    ===================== */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .stats div {
+      background: #ffffff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+      font-weight: 600;
+      font-size: 1.1em;
+    }
+
+    /* =====================
+       숫자 그리드
+    ===================== */
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(55px, 1fr));
+      gap: 8px;
+      max-width: 750px;
+      margin-bottom: 15px;
+    }
+
+    .cell {
+      background: #dcdde1;
+      color: #2f3640;
+      font-weight: bold;
+      font-size: 1.15em;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 10px;
+      cursor: pointer;
+      height: 55px;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .cell:hover {
+      transform: scale(1.08);
+      background: #7bed9f;
+      color: #fff;
+    }
+
+    /* 선택된 숫자 셀 */
+    .cell.selected {
+      background: #2ed573 !important;
+      color: #fff;
+      transform: scale(1.12);
+      box-shadow: 0 0 10px rgba(46, 213, 115, 0.5);
+    }
+
+    /* =====================
+       수식 입력창
+    ===================== */
+    #expressionDisplay {
+      width: 100%;
+      max-width: 600px;
+      background: #ffffff;
+      padding: 10px 15px;
+      margin-bottom: 10px;
+      border-radius: 12px;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+      font-size: 1.15em;
+      min-height: 40px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    /* =====================
+       결과 / 메시지 영역
+    ===================== */
+    #resultContainer {
+      width: 100%;
+      max-width: 600px;
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 12px 18px;
+      margin-bottom: 15px;
+      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.3s ease;
+    }
+
+    #resultValue {
+      font-size: 1.6em;
+      font-weight: bold;
+      color: #57606f;
+      transition: color 0.3s ease;
+    }
+
+    #message {
+      font-size: 1.1em;
+      font-weight: 600;
+      text-align: right;
+      min-width: 100px;
+      transition: color 0.3s ease, transform 0.3s ease;
+    }
+
+    .success { color: #2ed573; }
+    .fail    { color: #ff4757; }
+
+    /* =====================
+       연산자 버튼
+    ===================== */
+    #operators {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    #operators button {
+      flex: 1 1 55px;
+      min-width: 55px;
+      background: #3742fa;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 6px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #operators button:hover:not(:disabled) {
+      background: #5352ed;
+      transform: scale(1.05);
+    }
+
+    #operators button:disabled {
+      background: #dcdde1;
+      color: #999;
+      cursor: not-allowed;
+    }
+
+    .op-symbol { font-size: 1.4em; font-weight: bold; line-height: 1; }
+    .op-count  { font-size: 0.8em; margin-top: 2px; color: #f1f2f6; }
+
+    #clearBtn  { background: #ff4757; }
+    #clearBtn:hover:not(:disabled)  { background: #ff6b81; }
+    #submitBtn { background: #2ed573; }
+    #submitBtn:hover:not(:disabled) { background: #1eae57; }
+
+    /* =====================
+       흔들림 애니메이션
+    ===================== */
+    @keyframes shake {
+      0%   { transform: translateX(0); }
+      25%  { transform: translateX(-4px); }
+      50%  { transform: translateX(4px); }
+      75%  { transform: translateX(-4px); }
+      100% { transform: translateX(0); }
+    }
+
+    .shake { animation: shake 0.3s; }
+
+    /* =====================
+       반응형
+    ===================== */
+    @media (max-width: 600px) {
+      #grid { grid-template-columns: repeat(auto-fit, minmax(45px, 1fr)); }
+      #operators button { flex: 1 1 40%; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>수학 논리 퍼즐 게임</h1>
+
+  <div class="stats">
+    <div id="targetDisplay">타깃: 0</div>
+    <div id="timerDisplay">시간: 03:00</div>
+    <div id="scoreDisplay">토큰: 0</div>
+  </div>
+
+  <div id="grid"></div>
+
+  <div id="expressionDisplay"></div>
+
+  <div id="resultContainer">
+    <div id="resultValue">0</div>
+    <div id="message"></div>
+  </div>
+
+  <div id="operators">
+    <button data-op="+"><div class="op-symbol">+</div><div class="op-count" id="count-+">0/2</div></button>
+    <button data-op="-"><div class="op-symbol">−</div><div class="op-count" id="count--">0/2</div></button>
+    <button data-op="*"><div class="op-symbol">×</div><div class="op-count" id="count-*">0/2</div></button>
+    <button data-op="/"><div class="op-symbol">÷</div><div class="op-count" id="count-/">0/2</div></button>
+    <button data-op="√"><div class="op-symbol">√</div><div class="op-count" id="count-√">0/2</div></button>
+    <button data-op="!"><div class="op-symbol">!</div><div class="op-count" id="count-!">0/2</div></button>
+    <button data-op="("><div class="op-symbol">(</div><div class="op-count" id="count-(">0/2</div></button>
+    <button data-op=")"><div class="op-symbol">)</div><div class="op-count" id="count-)">0/2</div></button>
+    <button id="clearBtn">C</button>
+    <button id="submitBtn">Enter</button>
+  </div>
+
+  <script>
+    /* =====================
+       상수 정의
+    ===================== */
+    const GRID_ROWS      = 7;
+    const GRID_COLS      = 10;
+    const GRID_SIZE      = GRID_ROWS * GRID_COLS;
+    const NUMBER_MIN     = 1;
+    const NUMBER_MAX     = 100;
+    const TARGET_MIN     = 1000;
+    const TARGET_MAX     = 100000;
+    const TOTAL_TIME     = 180;   // 초
+    const OP_MAX_USAGE   = 2;     // 연산자당 최대 사용 횟수
+    const SHAKE_DURATION = 300;   // ms
+
+    /** 지원하는 연산자 목록 */
+    const OPERATORS = ["+", "-", "*", "/", "√", "!", "(", ")"];
+
+    /* =====================
+       게임 상태
+    ===================== */
+    let gridNumbers    = [];
+    let usedCellIndices = [];
+
+    /** 각 연산자의 현재 사용 횟수 */
+    let operatorUsage  = createOperatorUsageMap();
+
+    /** 마지막으로 입력한 토큰이 숫자인지 여부 (연속 숫자 입력 방지) */
+    let lastTokenWasNumber = false;
+
+    let target    = 0;
+    let score     = 0;
+    let timeLeft  = TOTAL_TIME;
+    let timerId   = null;
+
+    /* =====================
+       DOM 참조
+    ===================== */
+    const gridEl          = document.getElementById("grid");
+    const expressionEl    = document.getElementById("expressionDisplay");
+    const resultValueEl   = document.getElementById("resultValue");
+    const messageEl       = document.getElementById("message");
+    const targetDisplayEl = document.getElementById("targetDisplay");
+    const timerDisplayEl  = document.getElementById("timerDisplay");
+    const scoreDisplayEl  = document.getElementById("scoreDisplay");
+    const resultContainer = document.getElementById("resultContainer");
+
+    /* =====================
+       유틸리티
+    ===================== */
+
+    /**
+     * 각 연산자의 사용 횟수를 0으로 초기화한 맵 반환
+     * @returns {Object.<string, number>}
+     */
+    function createOperatorUsageMap() {
+      return Object.fromEntries(OPERATORS.map(op => [op, 0]));
+    }
+
+    /**
+     * min~max 범위에서 중복 없이 n개의 정수를 랜덤 추출
+     * Set을 이용한 rejection sampling 방식 — 범위 대비 n이 클수록 느려질 수 있음
+     * @param {number} n
+     * @param {number} min
+     * @param {number} max
+     * @returns {number[]}
+     */
+    function sampleUniqueIntegers(n, min, max) {
+      const resultSet = new Set();
+      while (resultSet.size < n) {
+        resultSet.add(Math.floor(Math.random() * (max - min + 1)) + min);
+      }
+      return Array.from(resultSet);
+    }
+
+    /**
+     * n! (팩토리얼) 계산
+     * @param {number} n
+     * @returns {number}
+     */
+    function factorial(n) {
+      if (n < 0)          return NaN;
+      if (n === 0 || n === 1) return 1;
+      let result = 1;
+      for (let i = 2; i <= n; i++) result *= i;
+      return result;
+    }
+
+    /**
+     * 수식 문자열을 eval 가능한 형태로 변환
+     * √, ! 같은 커스텀 연산자를 JS 함수 호출로 치환
+     * @param {string} expression
+     * @returns {string}
+     */
+    function parseExpression(expression) {
+      return expression
+        .replace(/√(\d+)/g,  "Math.sqrt($1)")
+        .replace(/(\d+)!/g,  "factorial($1)");
+    }
+
+    /**
+     * 요소에 흔들림 애니메이션 적용
+     * @param {HTMLElement} el
+     */
+    function triggerShake(el) {
+      el.classList.add("shake");
+      setTimeout(() => el.classList.remove("shake"), SHAKE_DURATION);
+    }
+
+    /* =====================
+       메시지 / 결과 렌더링
+    ===================== */
+
+    /**
+     * 메시지 표시
+     * @param {string} text
+     * @param {'success'|'fail'|''} type
+     */
+    function showMessage(text, type = "") {
+      messageEl.textContent = text;
+      messageEl.className   = type;
+    }
+
+    /**
+     * 결과값 표시 및 색상 변경
+     * @param {string|number} value
+     * @param {string} [color="#57606f"]
+     */
+    function showResultValue(value, color = "#57606f") {
+      resultValueEl.textContent = value;
+      resultValueEl.style.color = color;
+    }
+
+    /* =====================
+       연산자 UI 갱신
+    ===================== */
+
+    /** 연산자 사용 횟수 표시 및 버튼 활성화 상태 갱신 */
+    function renderOperatorUsage() {
+      OPERATORS.forEach(op => {
+        const countEl = document.getElementById(`count-${op}`);
+        const btnEl   = document.querySelector(`#operators button[data-op="${op}"]`);
+
+        if (countEl) countEl.textContent = `${operatorUsage[op]}/${OP_MAX_USAGE}`;
+        if (btnEl)   btnEl.disabled      = operatorUsage[op] >= OP_MAX_USAGE;
+      });
+    }
+
+    /* =====================
+       수식 실시간 계산
+    ===================== */
+
+    /** 현재 입력된 수식을 계산해 결과창에 표시 */
+    function evaluateAndDisplay() {
+      try {
+        const parsed = parseExpression(expressionEl.textContent);
+
+        // eval은 임의 코드 실행 위험이 있으나,
+        // 여기서는 숫자/연산자 버튼 입력만 허용하므로 안전하게 사용
+        const value  = eval(parsed);
+        showResultValue(Math.round(value * 100) / 100);
+        showMessage("", "");
+      } catch {
+        // 수식이 아직 완성되지 않은 중간 상태 — 결과값 비움
+        showResultValue("");
+      }
+    }
+
+    /* =====================
+       입력 초기화
+    ===================== */
+
+    /** 현재 수식 입력과 선택 상태를 모두 초기화 */
+    function clearInput() {
+      expressionEl.textContent = "";
+      showResultValue("0");
+      showMessage("", "");
+
+      usedCellIndices.forEach(idx => {
+        document.querySelectorAll(".cell")[idx].classList.remove("selected");
+      });
+
+      usedCellIndices    = [];
+      operatorUsage      = createOperatorUsageMap();
+      lastTokenWasNumber = false;
+      renderOperatorUsage();
+    }
+
+    /* =====================
+       숫자 선택 (셀 클릭)
+    ===================== */
+
+    /**
+     * 그리드 셀 클릭 시 호출
+     * @param {number} cellIndex
+     */
+    function handleCellClick(cellIndex) {
+      if (usedCellIndices.includes(cellIndex)) return;
+
+      if (lastTokenWasNumber) {
+        showMessage("숫자를 연속으로 선택할 수 없습니다.", "fail");
+        triggerShake(resultContainer);
+        return;
+      }
+
+      expressionEl.textContent += gridNumbers[cellIndex];
+      usedCellIndices.push(cellIndex);
+
+      const cellEl = document.querySelectorAll(".cell")[cellIndex];
+      cellEl.classList.add("selected");
+
+      lastTokenWasNumber = true;
+      evaluateAndDisplay();
+    }
+
+    /* =====================
+       연산자 입력
+    ===================== */
+
+    /**
+     * 연산자 버튼 클릭 시 호출
+     * @param {string} op - 연산자 문자
+     */
+    function handleOperatorClick(op) {
+      if (operatorUsage[op] >= OP_MAX_USAGE) {
+        showMessage(`'${op}' 연산자는 수식당 ${OP_MAX_USAGE}회까지만 사용 가능합니다.`, "fail");
+        triggerShake(resultContainer);
+        return;
+      }
+
+      expressionEl.textContent += op;
+      operatorUsage[op]++;
+      lastTokenWasNumber = false;
+
+      renderOperatorUsage();
+      evaluateAndDisplay();
+    }
+
+    /* =====================
+       제출 처리
+    ===================== */
+
+    /** Enter 버튼 클릭 — 수식 계산 후 정답 여부 판정 */
+    function handleSubmit() {
+      try {
+        const parsed = parseExpression(expressionEl.textContent);
+        const result = Math.round(eval(parsed));
+
+        if (result === target) {
+          const earned = usedCellIndices.length;
+          score += earned;
+          scoreDisplayEl.textContent = `토큰: ${score}`;
+          showMessage(`성공! +${earned} 토큰`, "success");
+          showResultValue(result, "#2ed573");
+          startNewRound();
+        } else {
+          showMessage("실패! 다시 시도하세요.", "fail");
+          showResultValue(result, "#ff4757");
+          triggerShake(resultContainer);
+          clearInput();
+        }
+      } catch {
+        showMessage("잘못된 수식!", "fail");
+        triggerShake(resultContainer);
+      }
+    }
+
+    /* =====================
+       이벤트 바인딩
+    ===================== */
+    document.querySelectorAll("#operators button[data-op]").forEach(btn => {
+      btn.addEventListener("click", () => handleOperatorClick(btn.dataset.op));
+    });
+
+    document.getElementById("clearBtn").addEventListener("click", clearInput);
+    document.getElementById("submitBtn").addEventListener("click", handleSubmit);
+
+    /* =====================
+       그리드 렌더링
+    ===================== */
+
+    /** 현재 gridNumbers 배열로 셀 DOM 재생성 */
+    function renderGrid() {
+      gridEl.innerHTML = "";
+      gridNumbers.forEach((num, index) => {
+        const cellEl = document.createElement("div");
+        cellEl.className   = "cell";
+        cellEl.textContent = num;
+        cellEl.addEventListener("click", () => handleCellClick(index));
+        gridEl.appendChild(cellEl);
+      });
+    }
+
+    /* =====================
+       타이머
+    ===================== */
+
+    /** 타이머 시작 (이전 타이머가 있으면 취소 후 재시작) */
+    function startTimer() {
+      clearInterval(timerId);
+      timeLeft = TOTAL_TIME;
+      renderTimerDisplay();
+
+      timerId = setInterval(() => {
+        if (timeLeft <= 0) {
+          clearInterval(timerId);
+          handleTimeUp();
+          return;
+        }
+        timeLeft--;
+        renderTimerDisplay();
+      }, 1000);
+    }
+
+    /** 타이머 HUD 갱신 */
+    function renderTimerDisplay() {
+      const min = String(Math.floor(timeLeft / 60)).padStart(2, "0");
+      const sec = String(timeLeft % 60).padStart(2, "0");
+      timerDisplayEl.textContent = `시간: ${min}:${sec}`;
+    }
+
+    /** 시간 종료 처리 */
+    function handleTimeUp() {
+      showMessage("시간 종료! 게임 종료.", "fail");
+      expressionEl.textContent = "";
+      showResultValue("0");
+      gridEl.innerHTML = "";
+    }
+
+    /* =====================
+       라운드 시작
+    ===================== */
+
+    /** 새 라운드 초기화 — 그리드와 타깃 재생성 */
+    function startNewRound() {
+      gridNumbers         = sampleUniqueIntegers(GRID_SIZE, NUMBER_MIN, NUMBER_MAX);
+      usedCellIndices     = [];
+      operatorUsage       = createOperatorUsageMap();
+      lastTokenWasNumber  = false;
+
+      renderGrid();
+      renderOperatorUsage();
+
+      target = Math.floor(Math.random() * (TARGET_MAX - TARGET_MIN + 1)) + TARGET_MIN;
+      targetDisplayEl.textContent = `타깃: ${target}`;
+
+      expressionEl.textContent = "";
+      showResultValue("0");
+      showMessage("", "");
+
+      startTimer();
+    }
+
+    /* =====================
+       초기화
+    ===================== */
+    startNewRound();
+  </script>
+</body>
+</html>
