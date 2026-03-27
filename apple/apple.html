@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>🍎 사과 게임</title>
+  <style>
+    /* =====================
+       Reset & Base
+    ===================== */
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f5f7fa;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 36px;
+      color: #ff4757;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    /* =====================
+       HUD (점수 + 타이머)
+    ===================== */
+    #hud {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 80%;
+      max-width: 800px;
+      margin-bottom: 20px;
+      font-size: 18px;
+    }
+
+    #scoreDisplay {
+      font-weight: bold;
+      color: #222;
+      white-space: nowrap;
+    }
+
+    #timerBarContainer {
+      flex-grow: 1;
+      height: 20px;
+      background-color: #d1d9e6;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-left: 15px;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    #timerBar {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ffb347, #ff6b6b);
+      transition: width 0.3s linear, background 0.3s;
+    }
+
+    /* =====================
+       Grid
+    ===================== */
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(17, 50px);
+      grid-template-rows: repeat(10, 50px);
+      gap: 6px;
+      position: relative;
+      user-select: none;
+    }
+
+    /* =====================
+       Cell
+    ===================== */
+    .cell {
+      width: 50px;
+      height: 50px;
+      background-color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 22px;
+      color: #111;
+      cursor: pointer;
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+      transition: transform 0.2s, background-color 0.3s, box-shadow 0.2s;
+    }
+
+    .cell:hover {
+      transform: scale(1.1);
+      background-color: #ffecec;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    /* 드래그 범위 내 선택된 셀 */
+    .cell.selected {
+      background-color: #ff6b81;
+      transform: scale(1.15);
+      box-shadow: 0 0 15px rgba(255, 107, 129, 0.5);
+      color: #fff;
+    }
+
+    /* 값이 제거된 빈 셀 */
+    .cell.empty {
+      background-color: #ffffff;
+      cursor: default;
+      box-shadow: none;
+      pointer-events: none;
+    }
+
+    /* =====================
+       드래그 선택 사각형
+    ===================== */
+    #selectionRect {
+      position: fixed;
+      border: 2px dashed #4fc3f7;
+      border-radius: 8px;
+      pointer-events: none;
+      display: none;
+      z-index: 100;
+    }
+
+    /* =====================
+       게임 종료 메시지
+    ===================== */
+    #gameOverMessage {
+      font-size: 28px;
+      color: #d32f2f;
+      margin-top: 30px;
+      text-align: center;
+      text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.6);
+    }
+
+    /* =====================
+       반응형
+    ===================== */
+    @media (max-width: 900px) {
+      #grid {
+        grid-template-columns: repeat(17, 35px);
+        grid-template-rows: repeat(10, 35px);
+        gap: 4px;
+      }
+
+      .cell {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🍎 사과 게임 🍎</h1>
+
+  <div id="hud">
+    <div id="scoreDisplay">점수: <span id="score">0</span></div>
+    <div id="timerBarContainer">
+      <div id="timerBar"></div>
+    </div>
+  </div>
+
+  <div id="grid"></div>
+  <div id="gameOverMessage"></div>
+  <div id="selectionRect"></div>
+
+  <script>
+    /* =====================
+       상수 정의
+    ===================== */
+    const ROWS        = 10;
+    const COLS        = 17;
+    const CELL_SIZE   = 50;  // px
+    const CELL_GAP    = 6;   // px
+    const TOTAL_CELLS = ROWS * COLS;
+    const TOTAL_TIME  = 120; // 초
+    const TARGET_SUM  = 10;  // 합이 이 값이면 제거
+
+    /** 타이머 바 색상 구간 */
+    const TIMER_COLORS = [
+      { threshold: 60, color: "linear-gradient(90deg, #ffb347, #ff6b6b)" }, // 60% 이상: 주황
+      { threshold: 30, color: "linear-gradient(90deg, #ffd46b, #ffb347)" }, // 30~60%: 노랑
+      { threshold: 0,  color: "linear-gradient(90deg, #ff6b6b, #ff3d3d)" }  // 30% 미만: 빨강
+    ];
+
+    /* =====================
+       게임 상태
+    ===================== */
+    let gridCells = []; // DOM 셀 요소 배열
+    let score     = 0;
+    let timeLeft  = TOTAL_TIME;
+    let isGameOver = false;
+
+    /* =====================
+       DOM 참조
+    ===================== */
+    const gridEl          = document.getElementById("grid");
+    const scoreEl         = document.getElementById("score");
+    const timerBarEl      = document.getElementById("timerBar");
+    const gameOverEl      = document.getElementById("gameOverMessage");
+    const selectionRectEl = document.getElementById("selectionRect");
+
+    /* =====================
+       드래그 상태
+    ===================== */
+    let dragStartPos = null; // { x, y }
+    let dragEndPos   = null; // { x, y }
+
+    /* =====================
+       그리드 초기화
+    ===================== */
+
+    /** 그리드를 1~9 랜덤 숫자로 초기화 */
+    function initGrid() {
+      gridEl.innerHTML = "";
+      gridCells = [];
+
+      for (let i = 0; i < TOTAL_CELLS; i++) {
+        const value  = Math.floor(Math.random() * 9) + 1;
+        const cellEl = createCellElement(value, i);
+        gridEl.appendChild(cellEl);
+        gridCells.push(cellEl);
+      }
+    }
+
+    /**
+     * 셀 DOM 요소 생성
+     * @param {number} value - 셀에 표시할 숫자 (1~9)
+     * @param {number} index - 전체 그리드에서의 인덱스
+     * @returns {HTMLElement}
+     */
+    function createCellElement(value, index) {
+      const cellEl = document.createElement("div");
+      cellEl.className       = "cell";
+      cellEl.textContent     = value;
+      cellEl.dataset.value   = value;
+      cellEl.dataset.index   = index;
+      return cellEl;
+    }
+
+    /* =====================
+       좌표 → 그리드 인덱스 변환
+    ===================== */
+
+    /**
+     * 화면 좌표를 그리드 행/열로 변환
+     * @param {number} clientX
+     * @param {number} clientY
+     * @param {DOMRect} gridRect - 그리드 요소의 getBoundingClientRect() 결과
+     * @returns {{ row: number, col: number }}
+     */
+    function clientToGridPosition(clientX, clientY, gridRect) {
+      const col = Math.floor((clientX - gridRect.left) / (CELL_SIZE + CELL_GAP));
+      const row = Math.floor((clientY - gridRect.top)  / (CELL_SIZE + CELL_GAP));
+      return { row, col };
+    }
+
+    /**
+     * 두 그리드 위치 사이의 사각형 범위 내 셀 목록 반환
+     * @param {{ row, col }} start
+     * @param {{ row, col }} end
+     * @returns {HTMLElement[]}
+     */
+    function getCellsInRange(start, end) {
+      const minRow = Math.max(0,      Math.min(start.row, end.row));
+      const maxRow = Math.min(ROWS-1, Math.max(start.row, end.row));
+      const minCol = Math.max(0,      Math.min(start.col, end.col));
+      const maxCol = Math.min(COLS-1, Math.max(start.col, end.col));
+
+      const cells = [];
+      for (let row = minRow; row <= maxRow; row++) {
+        for (let col = minCol; col <= maxCol; col++) {
+          cells.push(gridCells[row * COLS + col]);
+        }
+      }
+      return cells;
+    }
+
+    /* =====================
+       선택 하이라이트
+    ===================== */
+
+    /**
+     * 범위 내 비어있지 않은 셀에 selected 클래스 적용
+     * @param {HTMLElement[]} cells
+     */
+    function highlightSelectedCells(cells) {
+      gridCells.forEach(cell => cell.classList.remove("selected"));
+      cells.forEach(cell => {
+        if (!cell.classList.contains("empty")) {
+          cell.classList.add("selected");
+        }
+      });
+    }
+
+    /* =====================
+       합 판정 및 셀 제거
+    ===================== */
+
+    /**
+     * 선택된 셀들의 합이 TARGET_SUM이면 제거하고 점수 추가
+     * @param {HTMLElement[]} cells
+     */
+    function checkAndRemoveCells(cells) {
+      const activeCells = cells.filter(cell => !cell.classList.contains("empty"));
+      const sum = activeCells.reduce((acc, cell) => acc + Number(cell.dataset.value), 0);
+
+      if (sum === TARGET_SUM) {
+        score += activeCells.length;
+        scoreEl.textContent = score;
+
+        activeCells.forEach(cell => {
+          cell.textContent     = "";
+          cell.dataset.value   = "";
+          cell.classList.remove("selected");
+          cell.classList.add("empty");
+        });
+      }
+    }
+
+    /* =====================
+       드래그 선택 사각형 렌더링
+    ===================== */
+
+    /** 드래그 중인 선택 영역 사각형을 화면에 표시 */
+    function renderSelectionRect() {
+      if (!dragStartPos || !dragEndPos) return;
+
+      const left   = Math.min(dragStartPos.x, dragEndPos.x);
+      const top    = Math.min(dragStartPos.y, dragEndPos.y);
+      const width  = Math.abs(dragStartPos.x - dragEndPos.x);
+      const height = Math.abs(dragStartPos.y - dragEndPos.y);
+
+      selectionRectEl.style.left   = `${left}px`;
+      selectionRectEl.style.top    = `${top}px`;
+      selectionRectEl.style.width  = `${width}px`;
+      selectionRectEl.style.height = `${height}px`;
+    }
+
+    /** 선택 사각형을 초기화하고 숨김 */
+    function clearSelectionRect() {
+      selectionRectEl.style.display = "none";
+      selectionRectEl.style.width   = "0px";
+      selectionRectEl.style.height  = "0px";
+    }
+
+    /* =====================
+       드래그 이벤트
+    ===================== */
+    gridEl.addEventListener("mousedown", event => {
+      if (isGameOver || event.button !== 0) return;
+
+      dragStartPos = { x: event.clientX, y: event.clientY };
+      dragEndPos   = { x: event.clientX, y: event.clientY };
+
+      selectionRectEl.style.display = "block";
+      gridCells.forEach(cell => cell.classList.remove("selected"));
+    });
+
+    gridEl.addEventListener("mousemove", event => {
+      if (!dragStartPos) return;
+
+      dragEndPos = { x: event.clientX, y: event.clientY };
+      renderSelectionRect();
+
+      // 드래그 중 실시간 하이라이트
+      const gridRect = gridEl.getBoundingClientRect();
+      const startGrid = clientToGridPosition(dragStartPos.x, dragStartPos.y, gridRect);
+      const endGrid   = clientToGridPosition(dragEndPos.x,   dragEndPos.y,   gridRect);
+      highlightSelectedCells(getCellsInRange(startGrid, endGrid));
+    });
+
+    document.addEventListener("mouseup", event => {
+      if (!dragStartPos) return;
+
+      const gridRect  = gridEl.getBoundingClientRect();
+      const startGrid = clientToGridPosition(
+        Math.min(dragStartPos.x, dragEndPos.x),
+        Math.min(dragStartPos.y, dragEndPos.y),
+        gridRect
+      );
+      const endGrid = clientToGridPosition(
+        Math.max(dragStartPos.x, dragEndPos.x),
+        Math.max(dragStartPos.y, dragEndPos.y),
+        gridRect
+      );
+
+      const selectedCells = getCellsInRange(startGrid, endGrid);
+      checkAndRemoveCells(selectedCells);
+
+      // 드래그 상태 초기화
+      dragStartPos = null;
+      dragEndPos   = null;
+      clearSelectionRect();
+      gridCells.forEach(cell => cell.classList.remove("selected"));
+    });
+
+    /* =====================
+       타이머
+    ===================== */
+
+    /**
+     * 남은 시간 비율에 따라 타이머 바의 너비와 색상 갱신
+     * @param {number} remaining - 남은 초
+     */
+    function updateTimerBar(remaining) {
+      const percent = (remaining / TOTAL_TIME) * 100;
+      timerBarEl.style.width = `${percent}%`;
+
+      // 남은 비율에 따라 색상 결정 (가장 먼저 조건을 만족하는 구간 적용)
+      const colorEntry = TIMER_COLORS.find(entry => percent >= entry.threshold);
+      if (colorEntry) {
+        timerBarEl.style.background = colorEntry.color;
+      }
+    }
+
+    /** 타이머 시작 */
+    function startTimer() {
+      const timerId = setInterval(() => {
+        if (timeLeft <= 0) {
+          clearInterval(timerId);
+          endGame();
+          return;
+        }
+        timeLeft--;
+        updateTimerBar(timeLeft);
+      }, 1000);
+    }
+
+    /* =====================
+       게임 종료
+    ===================== */
+    function endGame() {
+      isGameOver = true;
+      gameOverEl.textContent = `게임 종료! 최종 점수: ${score}`;
+    }
+
+    /* =====================
+       초기화
+    ===================== */
+    initGrid();
+    startTimer();
+  </script>
+</body>
+</html>
