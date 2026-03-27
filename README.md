@@ -1,4 +1,4 @@
-# 🌐 Web Games — 군대에서 메모장으로 만든 웹 게임 모음
+# 🌐 Web Games
 
 ![HTML](https://img.shields.io/badge/HTML-2b2d3f?style=flat-square&logo=html5&logoColor=white)
 ![CSS](https://img.shields.io/badge/CSS-2b2d3f?style=flat-square&logo=css3&logoColor=white)
