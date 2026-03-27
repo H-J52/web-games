@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Yacht</title>
+  <style>
+    /* =====================
+       Reset & Base
+    ===================== */
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f2f4f8;
+      padding: 12px;
+      margin: 0;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    button {
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    /* =====================
+       Setup Screen
+    ===================== */
+    #setupScreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      margin-top: 40px;
+    }
+
+    #setupScreen h2 {
+      font-size: 20px;
+      margin: 0;
+    }
+
+    #setupScreen p {
+      font-size: 14px;
+      color: #555;
+      margin: 0;
+    }
+
+    .player-count-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .player-count-btn {
+      width: 60px;
+      height: 60px;
+      font-size: 22px;
+      font-weight: bold;
+      border: 2px solid #333;
+      border-radius: 12px;
+      background: white;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .player-count-btn:hover {
+      background: #e3f2fd;
+      transform: translateY(-2px);
+    }
+
+    /* =====================
+       Game Screen
+    ===================== */
+    #gameScreen {
+      display: none;
+    }
+
+    /* =====================
+       Roll Status
+    ===================== */
+    #rollDisplay {
+      text-align: center;
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    /* =====================
+       Dice
+    ===================== */
+    .dice-container {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .dice {
+      position: relative;
+      width: 50px;
+      height: 50px;
+      background: white;
+      border: 2px solid #333;
+      border-radius: 10px;
+      display: grid;
+      grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+      padding: 5px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s;
+    }
+
+    .dice.locked {
+      background: #e3f2fd;
+      border-color: #1976d2;
+    }
+
+    /* 고정 표시 핀 아이콘 */
+    .dice.locked::after {
+      content: "📌";
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      font-size: 14px;
+    }
+
+    /* 굴리기 애니메이션 */
+    .dice.rolling {
+      animation: rollShake 0.5s ease-in-out;
+    }
+
+    @keyframes rollShake {
+      0%   { transform: rotateZ(0deg)   translateX(0px);  }
+      25%  { transform: rotateZ(15deg)  translateX(-3px); }
+      50%  { transform: rotateZ(-15deg) translateX(3px);  }
+      75%  { transform: rotateZ(10deg)  translateX(-2px); }
+      100% { transform: rotateZ(0deg)   translateX(0px);  }
+    }
+
+    /* 주사위 점(dot) */
+    .dot {
+      width: 7px;
+      height: 7px;
+      background: #000;
+      border-radius: 50%;
+      justify-self: center;
+      align-self: center;
+      visibility: hidden;
+    }
+
+    .dot.visible {
+      visibility: visible;
+    }
+
+    /* =====================
+       Controls
+    ===================== */
+    .controls {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    /* =====================
+       Scoreboards
+    ===================== */
+    .scoreboards {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    table {
+      width: 240px;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      font-size: 12px;
+      border: 2px solid rgba(0, 0, 0, 0.6);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2), 0 8px 16px rgba(0, 0, 0, 0.15);
+      transition: transform 0.1s;
+    }
+
+    table.current-player {
+      box-shadow: 0 0 0 3px #1976d240;
+    }
+
+    table:not(.current-player) {
+      opacity: 0.6;
+    }
+
+    th, td {
+      border-bottom: 1px solid #ddd;
+      padding: 4px 6px;
+    }
+
+    th {
+      background: #e9ecef;
+      font-weight: 700;
+    }
+
+    /* 섹션 헤더 */
+    .section-header {
+      background: #dee2e6;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    /* 점수 셀 */
+    td.label {
+      text-align: left;
+    }
+
+    td.score-value {
+      text-align: right;
+      font-weight: 600;
+    }
+
+    /* 선택 가능한 셀 */
+    td.selectable:hover {
+      background: #e3f2fd;
+      box-shadow: 0 0 8px #1976d2;
+      transform: translateY(-2px);
+      cursor: pointer;
+    }
+
+    /* 사용 완료된 셀 */
+    td.used {
+      opacity: 0.5;
+    }
+
+    /* 미리보기(예상 점수) 셀 */
+    td.preview {
+      color: #888;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    /* 섹션 구분선 */
+    tr.upper-section-end td {
+      border-bottom: 2px solid #888;
+    }
+
+    /* 플레이어명 행 */
+    tr.player-name-row td {
+      background: #f0f0f0;
+      font-weight: 700;
+      text-align: center;
+      border-bottom: 2px solid #666;
+    }
+
+    /* 합계 행 스타일 */
+    tr.total-row td {
+      font-weight: 700;
+      border-top: 2px solid #bbb;
+    }
+
+    tr.total-upper td,
+    tr.total-lower td {
+      background: #fff3cd;
+    }
+
+    tr.total-bonus td {
+      background: #e0f7fa;
+      color: #00796b;
+      border-top: 2px dashed #999;
+      border-bottom: 2px solid #999;
+    }
+
+    tr.total-grand td {
+      background: #d1c4e9;
+      color: #4a148c;
+      font-size: 13px;
+      font-weight: 800;
+      border-top: 2px solid #7b1fa2;
+    }
+
+    @media (max-width: 600px) {
+      .scoreboards {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      table {
+        width: 100%;
+      }
+
+      .dice {
+        width: 40px;
+        height: 40px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🎲 Mini Yacht</h1>
+
+  <!-- 게임 시작 전: 인원 선택 화면 -->
+  <div id="setupScreen">
+    <h2>인원 수를 선택하세요</h2>
+    <p>2명 이상 4명 이하</p>
+    <div class="player-count-buttons">
+      <button class="player-count-btn" onclick="startGame(2)">2</button>
+      <button class="player-count-btn" onclick="startGame(3)">3</button>
+      <button class="player-count-btn" onclick="startGame(4)">4</button>
+    </div>
+  </div>
+
+  <!-- 게임 화면 -->
+  <div id="gameScreen">
+    <div id="rollDisplay">Roll 0 / 3</div>
+    <div class="dice-container" id="diceContainer"></div>
+    <div class="controls">
+      <button id="rollBtn" onclick="handleRoll()">Roll</button>
+    </div>
+    <div class="scoreboards" id="scoreboards"></div>
+  </div>
+
+  <script>
+    /* =====================
+       상수 정의
+    ===================== */
+
+    /**
+     * 카테고리 레이블 (UI 표시용)
+     */
+    const CATEGORY_LABELS = {
+      aces:          "Aces",
+      deuces:        "Deuces",
+      threes:        "Threes",
+      fours:         "Fours",
+      fives:         "Fives",
+      sixes:         "Sixes",
+      choice:        "Choice",
+      fourKind:      "Four of a Kind",
+      fullHouse:     "Full House",
+      smallStraight: "Small Straight",
+      largeStraight: "Large Straight",
+      yacht:         "Yacht"
+    };
+
+    /**
+     * 카테고리 설명 (클릭 시 안내용)
+     */
+    const CATEGORY_DESCRIPTIONS = {
+      aces:          "Aces : 1이 나온 주사위의 합계를 점수로 기록합니다.",
+      deuces:        "Deuces : 2가 나온 주사위의 합계를 점수로 기록합니다.",
+      threes:        "Threes : 3이 나온 주사위의 합계를 점수로 기록합니다.",
+      fours:         "Fours : 4가 나온 주사위의 합계를 점수로 기록합니다.",
+      fives:         "Fives : 5가 나온 주사위의 합계를 점수로 기록합니다.",
+      sixes:         "Sixes : 6이 나온 주사위의 합계를 점수로 기록합니다.",
+      choice:        "Choice : 어떤 숫자든 주사위의 합을 점수로 기록합니다.",
+      fourKind:      "Four of a Kind : 4개의 동일한 주사위가 나온 경우, 그 주사위의 합을 기록합니다.",
+      fullHouse:     "Full House : 3+2 조합이 나온 경우, 주사위의 합을 기록합니다.",
+      smallStraight: "Small Straight : 4개의 연속된 숫자가 나온 경우 30점을 얻습니다.",
+      largeStraight: "Large Straight : 5개의 연속된 숫자가 나온 경우 40점을 얻습니다.",
+      yacht:         "Yacht : 5개의 주사위가 모두 같은 경우 50점을 얻습니다."
+    };
+
+    /** Upper 섹션 카테고리 목록 */
+    const UPPER_CATEGORIES = ["aces", "deuces", "threes", "fours", "fives", "sixes"];
+
+    /** Lower 섹션 카테고리 목록 */
+    const LOWER_CATEGORIES = ["choice", "fourKind", "fullHouse", "smallStraight", "largeStraight", "yacht"];
+
+    /** 주사위 눈 위치 맵 (3x3 그리드 인덱스 기준) */
+    const DICE_DOT_MAP = {
+      1: [4],
+      2: [0, 8],
+      3: [0, 4, 8],
+      4: [0, 2, 6, 8],
+      5: [0, 2, 4, 6, 8],
+      6: [0, 2, 3, 5, 6, 8]
+    };
+
+    /** Upper 섹션 보너스 기준 합계 */
+    const UPPER_BONUS_THRESHOLD = 63;
+    const UPPER_BONUS_SCORE     = 35;
+
+    /* =====================
+       게임 상태
+    ===================== */
+    let gameState = createInitialState();
+
+    function createInitialState() {
+      return {
+        players:       [],
+        currentPlayer: 0,
+        diceValues:    Array(5).fill(1),
+        diceLocked:    Array(5).fill(false),
+        rollCount:     0,
+        isRolling:     false,
+        isGameOver:    false
+      };
+    }
+
+    /* =====================
+       플레이어 초기화
+    ===================== */
+
+    /**
+     * 플레이어 객체 생성
+     * @param {string} name - 플레이어 이름
+     */
+    function createPlayer(name) {
+      const scores = {};
+      const used   = {};
+      [...UPPER_CATEGORIES, ...LOWER_CATEGORIES].forEach(category => {
+        scores[category] = 0;
+        used[category]   = false;
+      });
+      return { name, scores, used };
+    }
+
+    /**
+     * 게임 시작 (인원 수 선택 후 호출)
+     * @param {number} playerCount - 참가 인원 수
+     */
+    function startGame(playerCount) {
+      gameState = createInitialState();
+      gameState.players = Array.from({ length: playerCount }, (_, i) =>
+        createPlayer(`Player ${i + 1}`)
+      );
+
+      document.getElementById("setupScreen").style.display = "none";
+      document.getElementById("gameScreen").style.display  = "block";
+
+      render();
+    }
+
+    /* =====================
+       턴 관리
+    ===================== */
+
+    /** 새 턴 시작 시 주사위 및 롤 횟수 초기화 */
+    function resetTurn() {
+      gameState.rollCount  = 0;
+      gameState.diceValues = Array(5).fill(1);
+      gameState.diceLocked = Array(5).fill(false);
+    }
+
+    /* =====================
+       주사위 굴리기
+    ===================== */
+
+    /** Roll 버튼 클릭 핸들러 */
+    function handleRoll() {
+      if (gameState.rollCount >= 3 || gameState.isRolling) return;
+
+      gameState.isRolling = true;
+
+      // 고정되지 않은 주사위에만 애니메이션 적용
+      document.querySelectorAll(".dice").forEach((diceEl, index) => {
+        if (!gameState.diceLocked[index]) {
+          diceEl.classList.add("rolling");
+        }
+      });
+
+      setTimeout(() => {
+        gameState.diceValues = gameState.diceValues.map((value, index) =>
+          gameState.diceLocked[index] ? value : getRandomDiceValue()
+        );
+        gameState.rollCount++;
+        gameState.isRolling = false;
+        render();
+      }, 500);
+    }
+
+    /**
+     * 1~6 사이의 무작위 정수 반환
+     * @returns {number}
+     */
+    function getRandomDiceValue() {
+      return Math.floor(Math.random() * 6) + 1;
+    }
+
+    /* =====================
+       렌더링
+    ===================== */
+
+    /** 전체 UI 갱신 */
+    function render() {
+      renderRollDisplay();
+      renderDice();
+      renderScoreboards();
+      checkGameOver();
+    }
+
+    /** 롤 횟수 표시 갱신 */
+    function renderRollDisplay() {
+      document.getElementById("rollDisplay").textContent =
+        `Roll ${gameState.rollCount} / 3`;
+      document.getElementById("rollBtn").disabled =
+        gameState.rollCount >= 3 || gameState.isRolling;
+    }
+
+    /** 주사위 UI 갱신 */
+    function renderDice() {
+      const container = document.getElementById("diceContainer");
+      container.innerHTML = "";
+
+      gameState.diceValues.forEach((value, index) => {
+        const diceEl = createDiceElement(value, index);
+        container.appendChild(diceEl);
+      });
+    }
+
+    /**
+     * 주사위 DOM 요소 생성
+     * @param {number} value - 주사위 값 (1~6)
+     * @param {number} index - 주사위 인덱스
+     * @returns {HTMLElement}
+     */
+    function createDiceElement(value, index) {
+      const diceEl = document.createElement("div");
+      diceEl.className = "dice" + (gameState.diceLocked[index] ? " locked" : "");
+
+      diceEl.onclick = () => toggleDiceLock(index);
+
+      // 3x3 그리드에 9개의 dot 배치
+      for (let position = 0; position < 9; position++) {
+        const dotEl = document.createElement("div");
+        const isVisible = DICE_DOT_MAP[value].includes(position);
+        dotEl.className = "dot" + (isVisible ? " visible" : "");
+        diceEl.appendChild(dotEl);
+      }
+
+      return diceEl;
+    }
+
+    /**
+     * 주사위 고정/해제 토글
+     * @param {number} index - 주사위 인덱스
+     */
+    function toggleDiceLock(index) {
+      if (gameState.rollCount === 0 || gameState.isRolling) return;
+      gameState.diceLocked[index] = !gameState.diceLocked[index];
+      render();
+    }
+
+    /** 점수판 UI 전체 갱신 */
+    function renderScoreboards() {
+      const container = document.getElementById("scoreboards");
+      container.innerHTML = "";
+
+      gameState.players.forEach((player, playerIndex) => {
+        const tableEl = buildScoreTable(player, playerIndex);
+        container.appendChild(tableEl);
+      });
+    }
+
+    /**
+     * 플레이어별 점수판 테이블 생성
+     * @param {object} player
+     * @param {number} playerIndex
+     * @returns {HTMLTableElement}
+     */
+    function buildScoreTable(player, playerIndex) {
+      const isCurrentPlayer = playerIndex === gameState.currentPlayer;
+      const tableEl = document.createElement("table");
+
+      if (isCurrentPlayer) tableEl.classList.add("current-player");
+
+      tableEl.innerHTML = buildScoreTableHTML(player, playerIndex, isCurrentPlayer);
+      return tableEl;
+    }
+
+    /**
+     * 점수판 테이블 HTML 생성
+     * @param {object} player
+     * @param {number} playerIndex
+     * @param {boolean} isCurrentPlayer
+     * @returns {string}
+     */
+    function buildScoreTableHTML(player, playerIndex, isCurrentPlayer) {
+      let html = "";
+
+      // 플레이어 이름
+      html += `<tr class="player-name-row">
+        <td colspan="2" onclick="promptRenamePlayer(${playerIndex})">${player.name}</td>
+      </tr>`;
+
+      // Upper 섹션
+      html += `<tr class="section-header"><th colspan="2">⬆ Upper</th></tr>`;
+      UPPER_CATEGORIES.forEach((category, i) => {
+        const isLastUpper = i === UPPER_CATEGORIES.length - 1;
+        html += buildScoreRowHTML(player, playerIndex, category, isCurrentPlayer, isLastUpper);
+      });
+
+      const upperSum = sumCategories(player, UPPER_CATEGORIES);
+      const bonus    = upperSum >= UPPER_BONUS_THRESHOLD ? UPPER_BONUS_SCORE : 0;
+      html += `<tr class="total-row total-upper">
+        <td>Up</td><td>${upperSum} / ${UPPER_BONUS_THRESHOLD}</td>
+      </tr>`;
+      html += `<tr class="total-row total-bonus">
+        <td>Bonus</td><td>${bonus}</td>
+      </tr>`;
+
+      // Lower 섹션
+      html += `<tr class="section-header"><th colspan="2">⬇ Lower</th></tr>`;
+      LOWER_CATEGORIES.forEach(category => {
+        html += buildScoreRowHTML(player, playerIndex, category, isCurrentPlayer, false);
+      });
+
+      const lowerSum  = sumCategories(player, LOWER_CATEGORIES);
+      const grandTotal = upperSum + bonus + lowerSum;
+      html += `<tr class="total-row total-lower">
+        <td>Low</td><td>${lowerSum}</td>
+      </tr>`;
+      html += `<tr class="total-row total-grand">
+        <td>Total</td><td>${grandTotal}</td>
+      </tr>`;
+
+      return html;
+    }
+
+    /**
+     * 카테고리 점수 행 HTML 생성
+     * 현재 플레이어이고 주사위를 굴린 상태라면 예상 점수를 미리 표시
+     * @param {object} player
+     * @param {number} playerIndex
+     * @param {string} category
+     * @param {boolean} isCurrentPlayer
+     * @param {boolean} isLastUpper - Upper 섹션 마지막 행 여부 (하단 테두리 스타일)
+     * @returns {string}
+     */
+    function buildScoreRowHTML(player, playerIndex, category, isCurrentPlayer, isLastUpper) {
+      const isUsed       = player.used[category];
+      const hasRolled    = gameState.rollCount > 0;
+      const showPreview  = isCurrentPlayer && !isUsed && hasRolled;
+
+      const displayValue = showPreview
+        ? `(${scoreCalc[category](gameState.diceValues)})`
+        : player.scores[category];
+
+      const rowClass     = isLastUpper ? "upper-section-end" : "";
+      const valueClasses = [
+        "score-value",
+        isUsed ? "used" : "",
+        showPreview ? "preview selectable" : ""
+      ].filter(Boolean).join(" ");
+
+      return `
+        <tr class="${rowClass}">
+          <td class="label selectable" onclick="showCategoryDescription('${category}')">
+            ${CATEGORY_LABELS[category]}
+          </td>
+          <td class="${valueClasses}" data-category="${category}" data-player-index="${playerIndex}">
+            ${displayValue}
+          </td>
+        </tr>
+      `;
+    }
+
+    /* =====================
+       점수 선택
+    ===================== */
+
+    // 점수판 클릭 이벤트 위임 — 특정 td 클릭 시 카테고리 점수 기록
+    document.getElementById("scoreboards")?.addEventListener("click", onScoreSelect);
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("scoreboards").addEventListener("click", onScoreSelect);
+    });
+
+    /**
+     * 점수 선택 이벤트 핸들러
+     * @param {MouseEvent} event
+     */
+    function onScoreSelect(event) {
+      const targetCell = event.target;
+      if (!targetCell.dataset.category || gameState.isRolling) return;
+
+      const playerIndex = Number(targetCell.dataset.playerIndex);
+      const category    = targetCell.dataset.category;
+
+      if (playerIndex !== gameState.currentPlayer) return;
+      if (gameState.rollCount === 0) return;
+
+      const player = gameState.players[playerIndex];
+      if (player.used[category]) return;
+
+      // 점수 기록
+      player.scores[category] = scoreCalc[category](gameState.diceValues);
+      player.used[category]   = true;
+
+      // 다음 플레이어 턴으로
+      gameState.currentPlayer = (gameState.currentPlayer + 1) % gameState.players.length;
+      resetTurn();
+      render();
+    }
+
+    /* =====================
+       플레이어 이름 변경
+    ===================== */
+
+    /**
+     * 플레이어 이름 변경 프롬프트
+     * @param {number} playerIndex
+     */
+    function promptRenamePlayer(playerIndex) {
+      const currentName = gameState.players[playerIndex].name;
+      const newName     = prompt("새 이름을 입력하세요:", currentName);
+      if (newName && newName.trim() !== "") {
+        gameState.players[playerIndex].name = newName.trim();
+        render();
+      }
+    }
+
+    /* =====================
+       카테고리 설명
+    ===================== */
+
+    /**
+     * 카테고리 설명 표시
+     * @param {string} category
+     */
+    function showCategoryDescription(category) {
+      alert(CATEGORY_DESCRIPTIONS[category] ?? "설명이 없습니다.");
+    }
+
+    /* =====================
+       게임 종료 처리
+    ===================== */
+
+    /** 모든 플레이어가 모든 카테고리를 채웠는지 확인 */
+    function checkGameOver() {
+      if (gameState.isGameOver) return;
+
+      const allFinished = gameState.players.every(player =>
+        Object.values(player.used).every(Boolean)
+      );
+
+      if (allFinished) {
+        gameState.isGameOver = true;
+        announceWinner();
+      }
+    }
+
+    /** 최고 점수 플레이어를 우승자로 선언 */
+    function announceWinner() {
+      const allCategories = [...UPPER_CATEGORIES, ...LOWER_CATEGORIES];
+
+      const winner = gameState.players.reduce((best, player) => {
+        const bestScore    = sumCategories(best, allCategories);
+        const playerScore  = sumCategories(player, allCategories);
+        return playerScore > bestScore ? player : best;
+      });
+
+      alert(`🎉 ${winner.name} 우승을 축하합니다! 🎉`);
+
+      if (confirm("게임을 다시 시작하시겠습니까?")) {
+        resetGame();
+      }
+    }
+
+    /** 게임 전체 초기화 */
+    function resetGame() {
+      gameState = createInitialState();
+      document.getElementById("gameScreen").style.display  = "none";
+      document.getElementById("setupScreen").style.display = "block";
+    }
+
+    /* =====================
+       점수 계산 함수
+    ===================== */
+
+    /**
+     * 카테고리별 점수 계산 함수 맵
+     * 각 함수는 주사위 배열(number[])을 받아 점수(number)를 반환
+     */
+    const scoreCalc = {
+      aces:          dice => sumByValue(dice, 1),
+      deuces:        dice => sumByValue(dice, 2),
+      threes:        dice => sumByValue(dice, 3),
+      fours:         dice => sumByValue(dice, 4),
+      fives:         dice => sumByValue(dice, 5),
+      sixes:         dice => sumByValue(dice, 6),
+      choice:        dice => sumAll(dice),
+      fourKind:      dice => hasNOfAKind(dice, 4) ? sumAll(dice) : 0,
+      fullHouse:     dice => isFullHouse(dice)     ? sumAll(dice) : 0,
+      smallStraight: dice => hasStraight(dice, 4)  ? 30 : 0,
+      largeStraight: dice => hasStraight(dice, 5)  ? 40 : 0,
+      yacht:         dice => hasNOfAKind(dice, 5)  ? 50 : 0
+    };
+
+    /**
+     * 특정 값의 주사위 합계 반환
+     * @param {number[]} dice
+     * @param {number} target
+     * @returns {number}
+     */
+    function sumByValue(dice, target) {
+      return dice
+        .filter(value => value === target)
+        .reduce((sum, value) => sum + value, 0);
+    }
+
+    /**
+     * 주사위 전체 합계 반환
+     * @param {number[]} dice
+     * @returns {number}
+     */
+    function sumAll(dice) {
+      return dice.reduce((sum, value) => sum + value, 0);
+    }
+
+    /**
+     * 주사위 값별 등장 횟수를 객체로 반환
+     * @param {number[]} dice
+     * @returns {Object.<number, number>}
+     */
+    function countByValue(dice) {
+      return dice.reduce((counts, value) => {
+        counts[value] = (counts[value] ?? 0) + 1;
+        return counts;
+      }, {});
+    }
+
+    /**
+     * 동일한 값이 N개 이상 있는지 확인
+     * @param {number[]} dice
+     * @param {number} n
+     * @returns {boolean}
+     */
+    function hasNOfAKind(dice, n) {
+      return Object.values(countByValue(dice)).some(count => count >= n);
+    }
+
+    /**
+     * Full House 여부 확인 (3개 + 2개 조합)
+     * @param {number[]} dice
+     * @returns {boolean}
+     */
+    function isFullHouse(dice) {
+      const counts = Object.values(countByValue(dice));
+      return counts.includes(3) && counts.includes(2);
+    }
+
+    /**
+     * 연속된 숫자가 N개 이상 있는지 확인
+     * @param {number[]} dice
+     * @param {number} length - 필요한 연속 길이
+     * @returns {boolean}
+     */
+    function hasStraight(dice, length) {
+      const uniqueSorted = [...new Set(dice)].sort((a, b) => a - b);
+
+      let maxStreak = 1;
+      let curStreak = 1;
+
+      for (let i = 1; i < uniqueSorted.length; i++) {
+        if (uniqueSorted[i] === uniqueSorted[i - 1] + 1) {
+          curStreak++;
+          maxStreak = Math.max(maxStreak, curStreak);
+        } else {
+          curStreak = 1;
+        }
+      }
+
+      return maxStreak >= length;
+    }
+
+    /**
+     * 특정 카테고리 목록의 점수 합계 반환
+     * @param {object} player
+     * @param {string[]} categories
+     * @returns {number}
+     */
+    function sumCategories(player, categories) {
+      return categories.reduce((sum, category) => sum + player.scores[category], 0);
+    }
+  </script>
+</body>
+
+</html>
