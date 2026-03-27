@@ -25,13 +25,13 @@ Unity를 설치할 수 없는 군대 환경에서, 게임을 만들고 싶다는
 
 ## 🕹 게임 목록
 
-| 게임 | 설명 | 인원 |
-|---|---|---|
-| 🍎 [사과 게임](https://H-J52.github.io/web-games/apple/apple.html) | 드래그로 합이 10인 숫자를 제거하는 퍼즐 게임 | 1인용 |
-| 🔫 [ONE BULLET : DUEL](https://H-J52.github.io/web-games/duel/duel.html) | 단 한 발로 상대를 먼저 맞춰야 하는 1v1 대전 | 2인용 |
-| 🚀 [Neon 2P PvP Shooter](https://H-J52.github.io/web-games/spaceShoot/spaceShoot.html) | 네온 배경의 2인 우주 슈팅 대전 | 2인용 |
-| 🧮 [Target Calc](https://H-J52.github.io/web-games/targetCalc/targetCalc.html) | 주어진 숫자로 목표값을 만드는 수학 퍼즐 | 1인용 |
-| 🎲 [Mini Yacht](https://H-J52.github.io/web-games/yacht/yacht.html) | 주사위로 점수를 쌓는 클래식 야추 | 멀티 |
+| 게임 | 설명 | 조작법 | 인원 |
+|---|---|---|---|
+| 🍎 [사과 게임](https://H-J52.github.io/web-games/apple/apple.html) | 드래그로 합이 10인 숫자를 제거하는 퍼즐 게임 | 마우스 드래그 | 1인용 |
+| 🔫 [ONE BULLET : DUEL](https://H-J52.github.io/web-games/duel/duel.html) | 단 한 발로 상대를 먼저 맞춰야 하는 1v1 대전 | P1: `A`방어 `S`발사 / P2: `K`방어 `L`발사 | 2인용 |
+| 🚀 [Neon 2P PvP Shooter](https://H-J52.github.io/web-games/spaceShoot/spaceShoot.html) | 네온 배경의 2인 우주 슈팅 대전 | P1: `WASD`이동 `F`공격 / P2: `방향키`이동 `Ctrl`공격 | 2인용 |
+| 🧮 [Target Calc](https://H-J52.github.io/web-games/targetCalc/targetCalc.html) | 주어진 숫자로 목표값을 만드는 수학 퍼즐 | 마우스 클릭 | 1인용 |
+| 🎲 [Mini Yacht](https://H-J52.github.io/web-games/yacht/yacht.html) | 주사위로 점수를 쌓는 클래식 야추 | 마우스 클릭 | 멀티 |
 
 <br>
 
