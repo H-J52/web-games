@@ -53,7 +53,7 @@ Canvas API, 키보드 이벤트, `requestAnimationFrame` 같은 웹 기술로 Un
 
 ### 2. JavaScript로 게임 루프 직접 설계
 
-Unity에서는 `MonoBehaviour`의 `Update()`가 게임 루프를 관리해줍니다. 웹에서는 `requestAnimationFrame`으로 직접 게임 루프를 구성해야 했습니다.
+웹에서는 `requestAnimationFrame`으로 직접 게임 루프를 구성해야 했습니다.
 
 상태 관리, 충돌 감지, 점수 계산까지 직접 설계하면서, Unity가 내부적으로 어떤 역할을 하는지 더 깊이 이해하게 됐습니다.
 
